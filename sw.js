@@ -1,9 +1,10 @@
-var CACHE_NAME = 'singaria-v1';
+var CACHE_NAME = 'singaria-v2';
 var ASSETS = [
-  '/index.html',
-  '/manifest.json',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
+  './',
+  './index.html',
+  './manifest.json',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
   'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@400;600;700&display=swap',
   'https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js'
 ];
@@ -46,7 +47,7 @@ self.addEventListener('fetch', function (e) {
       });
     }).catch(function () {
       if (e.request.destination === 'document') {
-        return caches.match('/index.html');
+        return caches.match('./index.html');
       }
     })
   );
