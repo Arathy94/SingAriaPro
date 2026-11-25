@@ -1,8 +1,7 @@
-var CACHE_NAME = 'singaria-v2';
+var CACHE_NAME = 'singaria-v3';
 var ASSETS = [
   './',
   './index.html',
-  './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
   'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@400;600;700&display=swap',
