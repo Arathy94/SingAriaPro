@@ -1,0 +1,1558 @@
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SingAria">
+<meta name="theme-color" content="#c8930a">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>SingAria Pro</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@400;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+<style>
+:root {
+    /* Layout: single-column centered app, full-width waveform, stacked controls */
+    --bg: #f9f9f6;
+    --surface: #fff;
+    --surface-hover: #f0efeb;
+    --border: #e0ded8;
+    --text: #1c1c22;
+    --text-dim: #6e6e7a;
+    --primary: #c8930a;
+    --primary-hover: #a67a08;
+    --primary-bg: rgba(200, 147, 10, 0.08);
+    --waveform: #3b7dd8;
+    --selection: rgba(200, 147, 10, 0.3);
+    --playhead: #c8930a;
+    --danger: #c0392b;
+    --radius: 8px;
+    --radius-lg: 12px;
+    --font-display: 'Sora', system-ui, sans-serif;
+    --font-body: 'DM Sans', system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg: #0d0d16;
+        --surface: #161624;
+        --surface-hover: #1e1e30;
+        --border: #2a2a3e;
+        --text: #eaeaf0;
+        --text-dim: #7a7a8f;
+        --primary: #e8b317;
+        --primary-hover: #d1a015;
+        --primary-bg: rgba(232, 179, 23, 0.1);
+        --waveform: #5a9af0;
+        --selection: rgba(232, 179, 23, 0.25);
+        --playhead: #e8b317;
+        --danger: #e74c3c;
+        color-scheme: dark;
+    }
+}
+:root[data-theme="dark"] {
+    --bg: #0d0d16;
+    --surface: #161624;
+    --surface-hover: #1e1e30;
+    --border: #2a2a3e;
+    --text: #eaeaf0;
+    --text-dim: #7a7a8f;
+    --primary: #e8b317;
+    --primary-hover: #d1a015;
+    --primary-bg: rgba(232, 179, 23, 0.1);
+    --waveform: #5a9af0;
+    --selection: rgba(232, 179, 23, 0.25);
+    --playhead: #e8b317;
+    --danger: #e74c3c;
+    color-scheme: dark;
+}
+
+[hidden] { display: none !important; }
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+.app {
+    max-width: 720px;
+    margin: 0 auto;
+    padding-block: 24px;
+}
+
+/* Upload screen */
+#upload-screen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+}
+
+.drop-zone {
+    width: 100%;
+    padding: 56px 32px;
+    border: 2px dashed var(--border);
+    border-radius: var(--radius-lg);
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+}
+.drop-zone:hover, .drop-zone.dragover {
+    border-color: var(--primary);
+    background: var(--primary-bg);
+}
+.drop-zone > * { pointer-events: none; }
+.drop-zone h2 {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+.drop-zone p { font-size: 14px; color: var(--text-dim); }
+.drop-zone .formats {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 16px;
+    opacity: 0.6;
+}
+.drop-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    color: var(--primary);
+    font-family: var(--font-display);
+}
+.drop-loading { padding: 48px; }
+.spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--border);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin: 0 auto 16px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Player screen */
+.header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.header h1 {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+.file-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-dim);
+    min-width: 0;
+}
+.file-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 200px;
+}
+
+/* Waveform */
+.waveform-section { padding-bottom: 4px; }
+.waveform-container {
+    position: relative;
+    width: 100%;
+    height: 128px;
+    background: var(--surface);
+    border-radius: var(--radius);
+    overflow: hidden;
+    cursor: crosshair;
+    border: 1px solid var(--border);
+}
+.waveform-container canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.zoom-scrollbar {
+    position: relative;
+    width: 100%;
+    height: 24px;
+    margin-top: 4px;
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    display: none;
+}
+.zoom-scrollbar canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    border-radius: var(--radius);
+}
+
+.time-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 2px;
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    color: var(--text-dim);
+}
+
+/* Controls */
+.controls-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 0;
+    flex-wrap: wrap;
+}
+
+.btn {
+    padding: 8px 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    white-space: nowrap;
+}
+.btn:hover { background: var(--surface-hover); border-color: var(--primary); }
+.btn:active { transform: scale(0.97); }
+.btn.primary-fill, .btn-icon.primary-fill {
+    background: var(--primary);
+    color: var(--bg);
+    border-color: var(--primary);
+}
+.btn.primary-fill:hover, .btn-icon.primary-fill:hover { background: var(--primary-hover); }
+
+.btn-icon {
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    padding: 0;
+    flex-shrink: 0;
+}
+.btn-icon:hover { background: var(--surface-hover); border-color: var(--primary); }
+.btn-icon:active { transform: scale(0.93); }
+.btn-icon.active { background: var(--primary-bg); border-color: var(--primary); color: var(--primary); }
+.btn-icon svg { display: block; }
+
+.btn-toggle {
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.btn-toggle:active { transform: scale(0.97); }
+.btn-toggle.active {
+    background: var(--primary);
+    color: var(--bg);
+    border-color: var(--primary);
+}
+
+/* Loop row */
+.loop-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 0;
+    flex-wrap: wrap;
+}
+.btn-sm {
+    padding: 5px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.btn-sm:hover { background: var(--surface-hover); }
+.btn-sm:active { transform: scale(0.97); }
+.btn-sm.active {
+    background: var(--primary-bg);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+.btn-sm.danger { color: var(--danger); }
+.btn-sm.danger:hover { border-color: var(--danger); }
+.loop-info {
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-dim);
+    flex: 1;
+    min-width: 0;
+}
+
+/* Sliders */
+.slider-section {
+    padding: 16px 0 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.slider-row label {
+    width: 44px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-dim);
+    flex-shrink: 0;
+}
+.slider-row input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+    min-width: 0;
+}
+.slider-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--primary);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.slider-row input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--primary);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.slider-row input[type="range"]:focus::-webkit-slider-thumb {
+    box-shadow: 0 0 0 4px var(--primary-bg);
+}
+.slider-val {
+    width: 52px;
+    text-align: right;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+    font-weight: 500;
+    flex-shrink: 0;
+}
+.btn-reset {
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface);
+    color: var(--text-dim);
+    font-family: var(--font-body);
+    font-size: 11px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s;
+}
+.btn-reset:hover { border-color: var(--primary); color: var(--text); }
+
+/* Lyrics */
+.lyrics-section { padding: 16px 0; }
+.lyrics-section label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+}
+.lyrics-section textarea {
+    width: 100%;
+    min-height: 180px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 14px;
+    line-height: 1.7;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.15s;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+}
+.lyrics-section textarea::placeholder { color: var(--text-dim); opacity: 0.6; }
+.lyrics-section textarea:focus { border-color: var(--primary); }
+
+/* Shortcuts hint */
+.shortcuts-hint {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-dim);
+    padding: 12px 0 0;
+    opacity: 0.7;
+}
+
+/* Error toast */
+.error-toast {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 16px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 10px 24px;
+    background: var(--danger);
+    color: #fff;
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 100;
+    animation: slideDown 0.25s ease-out;
+    max-width: calc(100% - 32px);
+    text-align: center;
+}
+@keyframes slideDown {
+    from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.btn-text {
+    background: none;
+    border: none;
+    color: var(--primary);
+    font-family: var(--font-body);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 0;
+}
+.btn-text:hover { text-decoration: underline; }
+
+@media (prefers-reduced-motion: reduce) {
+    .spinner { animation: none; }
+    .btn, .btn-toggle, .btn-sm, .btn-reset { transition: none; }
+}
+</style>
+
+<div class="app">
+    <div id="upload-screen">
+        <div class="drop-zone" id="drop-zone">
+            <div class="drop-icon">&#9835;</div>
+            <h2>Drop an audio file here</h2>
+            <p>or click to browse</p>
+            <p class="formats">MP3, WAV, OGG, FLAC, M4A, AAC</p>
+        </div>
+        <input type="file" id="file-input" accept="audio/*" hidden>
+    </div>
+
+    <div id="player-screen" hidden>
+        <header class="header">
+            <h1>SingAria Pro</h1>
+            <div class="file-info">
+                <span class="file-name" id="file-name"></span>
+                <button class="btn-text" id="change-btn">Change song</button>
+            </div>
+        </header>
+
+        <section class="waveform-section">
+            <div class="waveform-container" id="waveform-container">
+                <canvas id="waveform-canvas"></canvas>
+                <canvas id="overlay-canvas"></canvas>
+            </div>
+            <div class="zoom-scrollbar" id="zoom-scrollbar">
+                <canvas id="scrollbar-canvas"></canvas>
+            </div>
+            <div class="time-row">
+                <span id="current-time">0:00</span>
+                <span id="total-time">0:00</span>
+            </div>
+        </section>
+
+        <div class="controls-row">
+            <button class="btn-icon primary-fill" id="play-btn" aria-label="Play"><svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor"><polygon points="4,2 16,9 4,16"/></svg></button>
+            <button class="btn-icon" id="loop-btn" aria-label="Loop"><svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3l2 2-2 2"/><path d="M3 9V7a2 2 0 012-2h10"/><path d="M5 15l-2-2 2-2"/><path d="M15 9v2a2 2 0 01-2 2H3"/></svg></button>
+        </div>
+
+        <div class="loop-row">
+            <button class="btn-sm" id="set-a-btn">Set A</button>
+            <button class="btn-sm" id="set-b-btn">Set B</button>
+            <span class="loop-info" id="loop-info"></span>
+            <button class="btn-sm danger" id="clear-loop-btn">Clear</button>
+        </div>
+
+        <div class="slider-section">
+            <div class="slider-row">
+                <label for="speed-slider">Speed</label>
+                <input type="range" id="speed-slider" min="0.25" max="2" step="0.05" value="1">
+                <span class="slider-val" id="speed-val">1.00x</span>
+                <button class="btn-reset" id="speed-reset">Reset</button>
+            </div>
+            <div class="slider-row">
+                <label for="pitch-slider">Pitch</label>
+                <input type="range" id="pitch-slider" min="-12" max="12" step="1" value="0">
+                <span class="slider-val" id="pitch-val">0 st</span>
+                <button class="btn-reset" id="pitch-reset">Reset</button>
+            </div>
+        </div>
+
+        <div class="lyrics-section">
+            <label for="lyrics-area">Lyrics</label>
+            <textarea id="lyrics-area" placeholder="Type or paste lyrics here. They are saved automatically per song."></textarea>
+        </div>
+
+        <div class="shortcuts-hint">Space: play / stop &middot; Esc: stop</div>
+    </div>
+</div>
+
+<div id="error-toast" class="error-toast" hidden></div>
+
+<script>
+(function () {
+    var state = {
+        player: null,
+        pitchShift: null,
+        objectUrl: null,
+        duration: 0,
+        isPlaying: false,
+        currentPosition: 0,
+        playStartTime: 0,
+        playStartOffset: 0,
+        speed: 1,
+        pitch: 0,
+        loopEnabled: false,
+        loopStart: null,
+        loopEnd: null,
+        fileName: '',
+        waveformData: null,
+        dragging: false,
+        animFrame: null,
+        loopTimer: null,
+        zoom: 1,
+        viewStart: 0,
+        viewEnd: 0
+    };
+
+    var $ = function (id) { return document.getElementById(id); };
+    var el = {
+        uploadScreen: $('upload-screen'),
+        playerScreen: $('player-screen'),
+        dropZone: $('drop-zone'),
+        fileInput: $('file-input'),
+        wfCanvas: $('waveform-canvas'),
+        olCanvas: $('overlay-canvas'),
+        sbCanvas: $('scrollbar-canvas'),
+        zoomScrollbar: $('zoom-scrollbar'),
+        wfContainer: $('waveform-container'),
+        curTime: $('current-time'),
+        totTime: $('total-time'),
+        playBtn: $('play-btn'),
+        loopBtn: $('loop-btn'),
+        setA: $('set-a-btn'),
+        setB: $('set-b-btn'),
+        loopInfo: $('loop-info'),
+        clearLoop: $('clear-loop-btn'),
+        speedSlider: $('speed-slider'),
+        speedVal: $('speed-val'),
+        speedReset: $('speed-reset'),
+        pitchSlider: $('pitch-slider'),
+        pitchVal: $('pitch-val'),
+        pitchReset: $('pitch-reset'),
+        lyrics: $('lyrics-area'),
+        fileName: $('file-name'),
+        changeBtn: $('change-btn'),
+        errorToast: $('error-toast')
+    };
+
+    var ICON_PLAY = '<svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor"><polygon points="4,2 16,9 4,16"/></svg>';
+    var ICON_STOP = '<svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor"><rect x="3" y="3" width="12" height="12" rx="1"/></svg>';
+
+    function fmt(s) {
+        if (!isFinite(s) || s < 0) return '0:00';
+        var m = Math.floor(s / 60);
+        var sec = Math.floor(s % 60);
+        return m + ':' + (sec < 10 ? '0' : '') + sec;
+    }
+
+    function clamp(v, lo, hi) { return Math.min(Math.max(v, lo), hi); }
+
+    function showError(msg) {
+        el.errorToast.textContent = msg;
+        el.errorToast.hidden = false;
+        setTimeout(function () { el.errorToast.hidden = true; }, 3500);
+    }
+
+    var DB_NAME = 'SingAriaProDB';
+    var DB_VERSION = 1;
+    var STORE_NAME = 'audio';
+    var AUDIO_KEY = 'currentSong';
+
+    function openDB() {
+        return new Promise(function (resolve, reject) {
+            var req = indexedDB.open(DB_NAME, DB_VERSION);
+            req.onupgradeneeded = function () { req.result.createObjectStore(STORE_NAME); };
+            req.onsuccess = function () { resolve(req.result); };
+            req.onerror = function () { reject(req.error); };
+        });
+    }
+
+    function saveAudioToDB(blob, fileName) {
+        return openDB().then(function (db) {
+            return new Promise(function (resolve, reject) {
+                var tx = db.transaction(STORE_NAME, 'readwrite');
+                tx.objectStore(STORE_NAME).put({ blob: blob, fileName: fileName }, AUDIO_KEY);
+                tx.oncomplete = function () { db.close(); resolve(); };
+                tx.onerror = function () { db.close(); reject(tx.error); };
+            });
+        });
+    }
+
+    function getSavedAudio() {
+        return openDB().then(function (db) {
+            return new Promise(function (resolve, reject) {
+                var tx = db.transaction(STORE_NAME, 'readonly');
+                var req = tx.objectStore(STORE_NAME).get(AUDIO_KEY);
+                req.onsuccess = function () { db.close(); resolve(req.result || null); };
+                req.onerror = function () { db.close(); reject(req.error); };
+            });
+        });
+    }
+
+    function clearSavedAudio() {
+        return openDB().then(function (db) {
+            return new Promise(function (resolve, reject) {
+                var tx = db.transaction(STORE_NAME, 'readwrite');
+                tx.objectStore(STORE_NAME).delete(AUDIO_KEY);
+                tx.oncomplete = function () { db.close(); resolve(); };
+                tx.onerror = function () { db.close(); reject(tx.error); };
+            });
+        });
+    }
+
+    function getPos() {
+        if (!state.isPlaying) return state.currentPosition;
+        var elapsed = (Tone.now() - state.playStartTime) * state.speed;
+        var pos = state.playStartOffset + elapsed;
+        if (state.loopEnabled && state.loopStart !== null && state.loopEnd !== null) {
+            var len = state.loopEnd - state.loopStart;
+            if (len > 0 && pos > state.loopEnd) {
+                pos = state.loopStart + ((pos - state.loopStart) % len);
+            }
+        }
+        return clamp(pos, 0, state.duration);
+    }
+
+    function updateSliderFill(slider) {
+        var pct = ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
+        var s = getComputedStyle(document.documentElement);
+        var pri = s.getPropertyValue('--primary').trim();
+        var brd = s.getPropertyValue('--border').trim();
+        slider.style.background = 'linear-gradient(to right,' + pri + ' ' + pct + '%,' + brd + ' ' + pct + '%)';
+    }
+
+    function viewTimeFromX(cx) {
+        var rect = el.olCanvas.getBoundingClientRect();
+        var frac = clamp((cx - rect.left) / rect.width, 0, 1);
+        return state.viewStart + frac * (state.viewEnd - state.viewStart);
+    }
+
+    function viewXFromTime(t) {
+        var rect = el.olCanvas.getBoundingClientRect();
+        var span = state.viewEnd - state.viewStart;
+        if (span <= 0) return rect.left;
+        return rect.left + ((t - state.viewStart) / span) * rect.width;
+    }
+
+    function setView(start, end) {
+        var span = end - start;
+        if (span < 0.1) { span = 0.1; end = start + span; }
+        if (start < 0) { start = 0; end = span; }
+        if (end > state.duration) { end = state.duration; start = Math.max(0, end - span); }
+        state.viewStart = start;
+        state.viewEnd = end;
+        state.zoom = state.duration / (end - start);
+    }
+
+    function zoomAt(centerTime, factor) {
+        var span = state.viewEnd - state.viewStart;
+        var newSpan = clamp(span / factor, 0.1, state.duration);
+        var ratio = (centerTime - state.viewStart) / span;
+        var newStart = centerTime - ratio * newSpan;
+        setView(newStart, newStart + newSpan);
+        if (state.loopEnabled && state.loopStart !== null && state.loopEnd !== null) {
+            var loopSpan = state.loopEnd - state.loopStart;
+            if (loopSpan <= newSpan) {
+                var loopFits = state.loopStart >= state.viewStart && state.loopEnd <= state.viewEnd;
+                if (!loopFits) {
+                    var mid = (state.loopStart + state.loopEnd) / 2;
+                    setView(mid - newSpan / 2, mid + newSpan / 2);
+                }
+            }
+        }
+        drawWaveform();
+        drawOverlay();
+    }
+
+    function ensureVisible(t) {
+        var span = state.viewEnd - state.viewStart;
+        var margin = span * 0.1;
+        if (t < state.viewStart + margin) {
+            setView(t - margin, t - margin + span);
+            drawWaveform();
+        } else if (t > state.viewEnd - margin) {
+            setView(t + margin - span, t + margin);
+            drawWaveform();
+        }
+    }
+
+    function computeWaveform(buffer) {
+        var raw = buffer.getChannelData(0);
+        var nc = buffer.numberOfChannels;
+        var raw2 = nc > 1 ? buffer.getChannelData(1) : null;
+        var samples = 2000;
+        var block = Math.floor(raw.length / samples);
+        var data = [];
+        for (var i = 0; i < samples; i++) {
+            var mn = 1, mx = -1;
+            for (var j = 0; j < block; j++) {
+                var idx = i * block + j;
+                var v = raw[idx];
+                if (raw2) v = (v + raw2[idx]) * 0.5;
+                if (v < mn) mn = v;
+                if (v > mx) mx = v;
+            }
+            data.push({ min: mn, max: mx });
+        }
+        return data;
+    }
+
+    async function loadAudio(file, opts) {
+        var fromDB = opts && opts.fromDB;
+        var fileName = file.name || 'saved-song';
+        state.fileName = fileName;
+        el.fileName.textContent = fileName;
+        el.dropZone.innerHTML = '<div class="drop-loading"><div class="spinner"></div><p>Loading audio...</p></div>';
+
+        if (state.player) { state.player.stop(); state.player.dispose(); state.player = null; }
+        if (state.pitchShift) { state.pitchShift.dispose(); state.pitchShift = null; }
+        if (state.objectUrl) { URL.revokeObjectURL(state.objectUrl); state.objectUrl = null; }
+
+        await Tone.start();
+        var ab = await file.arrayBuffer();
+        var tempCtx = new (window.AudioContext || window.webkitAudioContext)();
+        var decoded;
+        try {
+            decoded = await tempCtx.decodeAudioData(ab);
+        } finally {
+            tempCtx.close();
+        }
+
+        var toneBuffer = new Tone.ToneAudioBuffer(decoded);
+        state.pitchShift = new Tone.PitchShift({ windowSize: 0.1 }).toDestination();
+        state.player = new Tone.Player(toneBuffer).connect(state.pitchShift);
+
+        state.duration = toneBuffer.duration;
+        state.waveformData = computeWaveform(toneBuffer);
+        state.currentPosition = 0;
+        state.isPlaying = false;
+        state.loopEnabled = false;
+        state.loopStart = null;
+        state.loopEnd = null;
+        state.speed = 1;
+        state.pitch = 0;
+        state.zoom = 1;
+        state.viewStart = 0;
+        state.viewEnd = toneBuffer.duration;
+
+        el.speedSlider.value = 1;
+        el.speedVal.textContent = '1.00x';
+        updateSliderFill(el.speedSlider);
+        el.pitchSlider.value = 0;
+        el.pitchVal.textContent = '0 st';
+        updateSliderFill(el.pitchSlider);
+        el.totTime.textContent = fmt(state.duration);
+        el.curTime.textContent = '0:00';
+        el.playBtn.innerHTML = ICON_PLAY;
+        el.loopBtn.classList.remove('active');
+        el.setA.classList.remove('active');
+        el.setB.classList.remove('active');
+        el.loopInfo.textContent = '';
+        el.lyrics.value = '';
+
+        showPlayer();
+        loadLyrics();
+
+        if (!fromDB) {
+            try { await saveAudioToDB(new Blob([ab], { type: file.type || 'audio/mpeg' }), fileName); }
+            catch (e) { /* IndexedDB unavailable — not critical */ }
+        }
+    }
+
+    function showPlayer() {
+        el.uploadScreen.hidden = true;
+        el.playerScreen.hidden = false;
+        resetDropZone();
+        resizeCanvases();
+    }
+
+    function resetDropZone() {
+        el.dropZone.innerHTML =
+            '<div class="drop-icon">&#9835;</div>' +
+            '<h2>Drop an audio file here</h2>' +
+            '<p>or click to browse</p>' +
+            '<p class="formats">MP3, WAV, OGG, FLAC, M4A, AAC</p>';
+    }
+
+    function showUpload() {
+        if (state.isPlaying) doStop();
+        el.uploadScreen.hidden = false;
+        el.playerScreen.hidden = true;
+        resetDropZone();
+    }
+
+    function resizeCanvases() {
+        var rect = el.wfContainer.getBoundingClientRect();
+        var dpr = window.devicePixelRatio || 1;
+        [el.wfCanvas, el.olCanvas].forEach(function (c) {
+            c.width = rect.width * dpr;
+            c.height = rect.height * dpr;
+            c.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+        });
+        var sbRect = el.zoomScrollbar.getBoundingClientRect();
+        el.sbCanvas.width = sbRect.width * dpr;
+        el.sbCanvas.height = sbRect.height * dpr;
+        el.sbCanvas.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+        drawWaveform();
+        drawOverlay();
+        drawScrollbar();
+    }
+
+    function colors() {
+        var s = getComputedStyle(document.documentElement);
+        return {
+            waveform: s.getPropertyValue('--waveform').trim(),
+            selection: s.getPropertyValue('--selection').trim(),
+            playhead: s.getPropertyValue('--playhead').trim(),
+            border: s.getPropertyValue('--border').trim(),
+            primary: s.getPropertyValue('--primary').trim(),
+            textDim: s.getPropertyValue('--text-dim').trim(),
+            surface: s.getPropertyValue('--surface').trim()
+        };
+    }
+
+    function drawWaveform() {
+        if (!state.waveformData) return;
+        var c = el.wfCanvas, ctx = c.getContext('2d');
+        var dpr = window.devicePixelRatio || 1;
+        var w = c.width / dpr, h = c.height / dpr;
+        var data = state.waveformData, col = colors();
+        ctx.clearRect(0, 0, w, h);
+
+        ctx.strokeStyle = col.border;
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(0, h / 2);
+        ctx.lineTo(w, h / 2);
+        ctx.stroke();
+
+        var span = state.viewEnd - state.viewStart;
+        if (span <= 0 || state.duration <= 0) return;
+        var iStart = Math.floor((state.viewStart / state.duration) * data.length);
+        var iEnd = Math.ceil((state.viewEnd / state.duration) * data.length);
+        iStart = clamp(iStart, 0, data.length);
+        iEnd = clamp(iEnd, 0, data.length);
+        var visibleCount = iEnd - iStart;
+        if (visibleCount <= 0) return;
+
+        var barW = w / visibleCount;
+        var half = h / 2;
+        var amp = half * 0.88;
+        ctx.fillStyle = col.waveform;
+        for (var i = 0; i < visibleCount; i++) {
+            var d = data[iStart + i];
+            var y1 = half - d.max * amp;
+            var y2 = half - d.min * amp;
+            ctx.fillRect(i * barW, y1, Math.max(1, barW - 0.3), Math.max(1, y2 - y1));
+        }
+    }
+
+    function timeToX(t, w) {
+        var span = state.viewEnd - state.viewStart;
+        if (span <= 0) return 0;
+        return ((t - state.viewStart) / span) * w;
+    }
+
+    function drawOverlay() {
+        var c = el.olCanvas, ctx = c.getContext('2d');
+        var dpr = window.devicePixelRatio || 1;
+        var w = c.width / dpr, h = c.height / dpr;
+        var col = colors();
+        ctx.clearRect(0, 0, w, h);
+        if (state.duration <= 0) return;
+
+        if (state.loopStart !== null && state.loopEnd !== null) {
+            var x1 = timeToX(state.loopStart, w);
+            var x2 = timeToX(state.loopEnd, w);
+            ctx.fillStyle = col.selection;
+            ctx.fillRect(x1, 0, x2 - x1, h);
+            ctx.strokeStyle = col.primary;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.moveTo(x1, 0); ctx.lineTo(x1, h); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(x2, 0); ctx.lineTo(x2, h); ctx.stroke();
+            ctx.fillStyle = col.primary;
+            ctx.font = '500 10px ' + getComputedStyle(document.documentElement).getPropertyValue('--font-body').trim();
+            if (x1 > 0) { ctx.textAlign = 'left'; ctx.fillText('A ' + fmt(state.loopStart), x1 + 4, 13); }
+            if (x2 < w) { ctx.textAlign = 'right'; ctx.fillText('B ' + fmt(state.loopEnd), x2 - 4, 13); }
+        }
+
+        var pos = getPos();
+        var px = timeToX(pos, w);
+        ctx.strokeStyle = col.playhead;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, h); ctx.stroke();
+        ctx.fillStyle = col.playhead;
+        ctx.beginPath(); ctx.arc(px, 6, 5, 0, Math.PI * 2); ctx.fill();
+        drawScrollbar();
+    }
+
+    function drawScrollbar() {
+        var show = state.zoom > 1.01 && state.duration > 0;
+        el.zoomScrollbar.style.display = show ? 'block' : 'none';
+        if (!show || !state.waveformData) return;
+
+        var c = el.sbCanvas, ctx = c.getContext('2d');
+        var dpr = window.devicePixelRatio || 1;
+        var w = c.width / dpr, h = c.height / dpr;
+        var col = colors();
+        ctx.clearRect(0, 0, w, h);
+
+        var data = state.waveformData;
+        var barW = w / data.length;
+        var half = h / 2, amp = half * 0.85;
+        ctx.fillStyle = col.border;
+        for (var i = 0; i < data.length; i++) {
+            var d = data[i];
+            var y1 = half - d.max * amp;
+            var y2 = half - d.min * amp;
+            ctx.fillRect(i * barW, y1, Math.max(1, barW - 0.3), Math.max(1, y2 - y1));
+        }
+
+        var x1 = (state.viewStart / state.duration) * w;
+        var x2 = (state.viewEnd / state.duration) * w;
+        ctx.fillStyle = col.selection;
+        ctx.fillRect(x1, 0, x2 - x1, h);
+        ctx.strokeStyle = col.primary;
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(x1, 0, x2 - x1, h);
+
+        var pos = getPos();
+        var px = (pos / state.duration) * w;
+        ctx.strokeStyle = col.playhead;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, h); ctx.stroke();
+    }
+
+    function updatePitchShift() {
+        if (!state.pitchShift) return;
+        var speedComp = state.speed > 0 ? -12 * Math.log2(state.speed) : 0;
+        state.pitchShift.pitch = speedComp + state.pitch;
+    }
+
+    async function doPlay() {
+        await Tone.start();
+        if (!state.player || state.isPlaying) return;
+
+        var offset = state.currentPosition;
+        if (state.loopEnabled && state.loopStart !== null && state.loopEnd !== null) {
+            if (offset < state.loopStart || offset >= state.loopEnd) offset = state.loopStart;
+        }
+
+        state.player.loop = false;
+        state.player.playbackRate = state.speed;
+        updatePitchShift();
+        var now = Tone.now();
+        state.player.start(now, offset);
+        state.playStartTime = now;
+        state.playStartOffset = offset;
+        state.isPlaying = true;
+        el.playBtn.innerHTML = ICON_STOP;
+        el.playBtn.classList.add('primary-fill');
+        scheduleLoopEnd();
+        startAnim();
+    }
+
+    function doStop() {
+        if (!state.player) return;
+        cancelLoopTimer();
+        state.currentPosition = getPos();
+        state.player.stop();
+        state.isPlaying = false;
+        el.playBtn.innerHTML = ICON_PLAY;
+        el.playBtn.classList.add('primary-fill');
+        drawOverlay();
+    }
+
+    function seekTo(pos) {
+        pos = clamp(pos, 0, state.duration);
+        state.currentPosition = pos;
+        if (state.isPlaying) {
+            state.player.stop();
+            var now = Tone.now();
+            state.player.start(now, pos);
+            state.playStartTime = now;
+            state.playStartOffset = pos;
+            scheduleLoopEnd();
+        }
+        el.curTime.textContent = fmt(pos);
+        drawOverlay();
+    }
+
+    function setSpeed(v) {
+        if (state.isPlaying && state.player) {
+            var now = Tone.now();
+            var pos = state.playStartOffset + (now - state.playStartTime) * state.speed;
+            state.playStartOffset = clamp(pos, 0, state.duration);
+            state.playStartTime = now;
+            state.speed = v;
+            state.player.playbackRate = v;
+        } else {
+            state.speed = v;
+            if (state.player) state.player.playbackRate = v;
+        }
+        updatePitchShift();
+        el.speedVal.textContent = v.toFixed(2) + 'x';
+        updateSliderFill(el.speedSlider);
+        scheduleLoopEnd();
+    }
+
+    function setPitch(v) {
+        state.pitch = v;
+        updatePitchShift();
+        el.pitchVal.textContent = (v > 0 ? '+' : '') + v + ' st';
+        updateSliderFill(el.pitchSlider);
+    }
+
+    function cancelLoopTimer() {
+        if (state.loopTimer) { clearTimeout(state.loopTimer); state.loopTimer = null; }
+    }
+
+    function restartAtLoopStart() {
+        if (!state.isPlaying || !state.player) return;
+        state.player.stop();
+        var now = Tone.now();
+        state.player.start(now, state.loopStart);
+        state.playStartTime = now;
+        state.playStartOffset = state.loopStart;
+        scheduleLoopEnd();
+    }
+
+    function scheduleLoopEnd() {
+        cancelLoopTimer();
+        if (!state.isPlaying || !state.loopEnabled || state.loopStart === null || state.loopEnd === null) return;
+        var pos = state.playStartOffset;
+        var remaining = state.loopEnd - pos;
+        if (remaining <= 0) return;
+        var ms = (remaining / state.speed) * 1000 - 80;
+        if (ms < 0) ms = 0;
+        state.loopTimer = setTimeout(restartAtLoopStart, ms);
+    }
+
+    function applyLoop() {
+        if (!state.player || !state.isPlaying) return;
+        cancelLoopTimer();
+        if (state.loopEnabled && state.loopStart !== null && state.loopEnd !== null) {
+            var rawElapsed = (Tone.now() - state.playStartTime) * state.speed;
+            var rawPos = state.playStartOffset + rawElapsed;
+            if (rawPos < state.loopStart || rawPos >= state.loopEnd) {
+                state.player.stop();
+                var now = Tone.now();
+                state.player.start(now, state.loopStart);
+                state.playStartTime = now;
+                state.playStartOffset = state.loopStart;
+            }
+            scheduleLoopEnd();
+        }
+    }
+
+    function toggleLoop() {
+        state.loopEnabled = !state.loopEnabled;
+        el.loopBtn.classList.toggle('active', state.loopEnabled);
+        if (!state.loopEnabled) {
+            cancelLoopTimer();
+            state.loopStart = null;
+            state.loopEnd = null;
+            el.setA.classList.remove('active');
+            el.setB.classList.remove('active');
+        } else {
+            applyLoop();
+        }
+        updateLoopInfo();
+        drawOverlay();
+    }
+
+    function setA() {
+        state.loopStart = getPos();
+        if (state.loopEnd !== null && state.loopEnd <= state.loopStart) state.loopEnd = null;
+        el.setA.classList.add('active');
+        if (state.loopStart !== null && state.loopEnd !== null && !state.loopEnabled) {
+            state.loopEnabled = true;
+            el.loopBtn.classList.add('active');
+        }
+        applyLoop();
+        updateLoopInfo();
+        drawOverlay();
+    }
+
+    function setB() {
+        state.loopEnd = getPos();
+        if (state.loopStart !== null && state.loopStart >= state.loopEnd) state.loopStart = null;
+        el.setB.classList.add('active');
+        if (state.loopStart !== null && state.loopEnd !== null && !state.loopEnabled) {
+            state.loopEnabled = true;
+            el.loopBtn.classList.add('active');
+        }
+        applyLoop();
+        updateLoopInfo();
+        drawOverlay();
+    }
+
+    function clearLoopRegion() {
+        state.loopStart = null;
+        state.loopEnd = null;
+        state.loopEnabled = false;
+        el.loopBtn.classList.remove('active');
+        el.setA.classList.remove('active');
+        el.setB.classList.remove('active');
+        updateLoopInfo();
+        drawOverlay();
+    }
+
+    function updateLoopInfo() {
+        if (state.loopStart !== null && state.loopEnd !== null) {
+            el.loopInfo.textContent = fmt(state.loopStart) + ' → ' + fmt(state.loopEnd);
+        } else if (state.loopStart !== null) {
+            el.loopInfo.textContent = 'A: ' + fmt(state.loopStart);
+        } else if (state.loopEnd !== null) {
+            el.loopInfo.textContent = 'B: ' + fmt(state.loopEnd);
+        } else {
+            el.loopInfo.textContent = '';
+        }
+    }
+
+    function startAnim() {
+        if (state.animFrame) return;
+        (function tick() {
+            if (!state.isPlaying) { state.animFrame = null; return; }
+            var rawElapsed = (Tone.now() - state.playStartTime) * state.speed;
+            var rawPos = state.playStartOffset + rawElapsed;
+            var pos = getPos();
+            if (state.loopEnabled && state.loopStart !== null && state.loopEnd !== null && rawPos >= state.loopEnd) {
+                restartAtLoopStart();
+                pos = state.loopStart;
+            } else if (!state.loopEnabled && pos >= state.duration - 0.05) {
+                state.player.stop();
+                state.isPlaying = false;
+                state.currentPosition = state.duration;
+                el.playBtn.innerHTML = ICON_PLAY;
+                el.playBtn.classList.add('primary-fill');
+                el.curTime.textContent = fmt(state.duration);
+                drawOverlay();
+                state.animFrame = null;
+                return;
+            }
+            el.curTime.textContent = fmt(pos);
+            if (state.zoom > 1) {
+                if (state.loopEnabled && state.loopStart !== null && state.loopEnd !== null) {
+                    var loopSpan = state.loopEnd - state.loopStart;
+                    var viewSpan = state.viewEnd - state.viewStart;
+                    if (loopSpan <= viewSpan) {
+                        var loopFits = state.loopStart >= state.viewStart && state.loopEnd <= state.viewEnd;
+                        if (!loopFits) {
+                            var mid = (state.loopStart + state.loopEnd) / 2;
+                            setView(mid - viewSpan / 2, mid + viewSpan / 2);
+                            drawWaveform();
+                        }
+                    } else {
+                        ensureVisible(pos);
+                    }
+                } else {
+                    ensureVisible(pos);
+                }
+            }
+            drawOverlay();
+            state.animFrame = requestAnimationFrame(tick);
+        })();
+    }
+
+    function saveLyrics() {
+        try {
+            if (state.fileName) localStorage.setItem('singaria_lyrics_' + state.fileName, el.lyrics.value);
+        } catch (e) {}
+    }
+
+    function loadLyrics() {
+        try {
+            var saved = state.fileName ? localStorage.getItem('singaria_lyrics_' + state.fileName) : null;
+            el.lyrics.value = saved || '';
+        } catch (e) { el.lyrics.value = ''; }
+    }
+
+    function handleFile(file) {
+        if (!file) return;
+        loadAudio(file).catch(function () {
+            showError('Could not load this audio file. Try a different format.');
+            showUpload();
+        });
+    }
+
+    // Waveform interaction: drag to select, drag edges to resize, drag inside to move
+    (function () {
+        var dragStart = null, dragStartPos = 0;
+        var dragMode = 'none'; // 'none' | 'select' | 'move' | 'resize-left' | 'resize-right'
+        var origLoopStart = 0, origLoopEnd = 0;
+        var EDGE_PX = 10;
+
+        function timeFromX(cx) {
+            var rect = el.olCanvas.getBoundingClientRect();
+            var frac = clamp((cx - rect.left) / rect.width, 0, 1);
+            return state.viewStart + frac * (state.viewEnd - state.viewStart);
+        }
+        function xFromTime(t) {
+            var rect = el.olCanvas.getBoundingClientRect();
+            var span = state.viewEnd - state.viewStart;
+            if (span <= 0) return rect.left;
+            return ((t - state.viewStart) / span) * rect.width + rect.left;
+        }
+        function hitTest(cx) {
+            if (state.loopStart === null || state.loopEnd === null) return 'select';
+            var lx = xFromTime(state.loopStart), rx = xFromTime(state.loopEnd);
+            if (Math.abs(cx - lx) <= EDGE_PX) return 'resize-left';
+            if (Math.abs(cx - rx) <= EDGE_PX) return 'resize-right';
+            if (cx > lx + EDGE_PX && cx < rx - EDGE_PX) return 'move';
+            return 'select';
+        }
+
+        el.olCanvas.addEventListener('mousemove', function (e) {
+            if (state.dragging) return;
+            var mode = hitTest(e.clientX);
+            el.olCanvas.style.cursor =
+                mode === 'resize-left' || mode === 'resize-right' ? 'ew-resize' :
+                mode === 'move' ? 'grab' : 'crosshair';
+        });
+
+        function onDown(cx) {
+            dragMode = hitTest(cx);
+            dragStart = { x: cx };
+            dragStartPos = timeFromX(cx);
+            origLoopStart = state.loopStart;
+            origLoopEnd = state.loopEnd;
+            state.dragging = true;
+            if (dragMode === 'move') el.olCanvas.style.cursor = 'grabbing';
+        }
+        function onMove(cx) {
+            if (!state.dragging || !dragStart) return;
+            var dx = Math.abs(cx - dragStart.x);
+            var t = timeFromX(cx);
+
+            if (dragMode === 'move' && origLoopStart !== null && origLoopEnd !== null) {
+                var len = origLoopEnd - origLoopStart;
+                var delta = t - dragStartPos;
+                var newStart = origLoopStart + delta;
+                var newEnd = origLoopEnd + delta;
+                if (newStart < 0) { newStart = 0; newEnd = len; }
+                if (newEnd > state.duration) { newEnd = state.duration; newStart = state.duration - len; }
+                state.loopStart = newStart;
+                state.loopEnd = newEnd;
+            } else if (dragMode === 'resize-left') {
+                state.loopStart = clamp(t, 0, (origLoopEnd || state.duration) - 0.05);
+                if (state.loopEnd === null) state.loopEnd = origLoopEnd;
+            } else if (dragMode === 'resize-right') {
+                state.loopEnd = clamp(t, (origLoopStart || 0) + 0.05, state.duration);
+                if (state.loopStart === null) state.loopStart = origLoopStart;
+            } else if (dragMode === 'select' && dx > 5) {
+                state.loopStart = Math.min(dragStartPos, t);
+                state.loopEnd = Math.max(dragStartPos, t);
+            } else {
+                return;
+            }
+
+            if (!state.loopEnabled) { state.loopEnabled = true; el.loopBtn.classList.add('active'); }
+            el.setA.classList.add('active');
+            el.setB.classList.add('active');
+            applyLoop();
+            updateLoopInfo();
+            drawOverlay();
+        }
+        function onUp(cx) {
+            if (!state.dragging) return;
+            state.dragging = false;
+            if (dragStart && dragMode === 'select' && Math.abs(cx - dragStart.x) <= 5) {
+                seekTo(timeFromX(cx));
+            }
+            dragStart = null;
+            dragMode = 'none';
+            el.olCanvas.style.cursor = 'crosshair';
+        }
+
+        el.olCanvas.addEventListener('mousedown', function (e) { e.preventDefault(); onDown(e.clientX); });
+        window.addEventListener('mousemove', function (e) { onMove(e.clientX); });
+        window.addEventListener('mouseup', function (e) { onUp(e.clientX); });
+
+        var pinchStartDist = 0, pinchStartSpan = 0, pinchCenter = 0;
+        el.olCanvas.addEventListener('touchstart', function (e) {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                var t0 = e.touches[0], t1 = e.touches[1];
+                pinchStartDist = Math.abs(t1.clientX - t0.clientX);
+                pinchStartSpan = state.viewEnd - state.viewStart;
+                var rect = el.olCanvas.getBoundingClientRect();
+                var midX = (t0.clientX + t1.clientX) / 2;
+                pinchCenter = state.viewStart + clamp((midX - rect.left) / rect.width, 0, 1) * (state.viewEnd - state.viewStart);
+                return;
+            }
+            e.preventDefault(); onDown(e.touches[0].clientX);
+        }, { passive: false });
+        el.olCanvas.addEventListener('touchmove', function (e) {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                var t0 = e.touches[0], t1 = e.touches[1];
+                var dist = Math.abs(t1.clientX - t0.clientX);
+                if (pinchStartDist < 1) return;
+                var scale = dist / pinchStartDist;
+                var newSpan = clamp(pinchStartSpan / scale, 0.1, state.duration);
+                var ratio = (pinchCenter - state.viewStart) / (state.viewEnd - state.viewStart);
+                var newStart = pinchCenter - ratio * newSpan;
+                setView(newStart, newStart + newSpan);
+                drawWaveform(); drawOverlay();
+                return;
+            }
+            onMove(e.touches[0].clientX);
+        }, { passive: false });
+        el.olCanvas.addEventListener('touchend', function (e) {
+            onUp(e.changedTouches.length ? e.changedTouches[0].clientX : (dragStart ? dragStart.x : 0));
+        });
+
+        // Scroll-wheel zoom + horizontal scroll pan
+        el.olCanvas.addEventListener('wheel', function (e) {
+            if (state.duration <= 0) return;
+            e.preventDefault();
+            if (state.zoom > 1.01 && (Math.abs(e.deltaX) > Math.abs(e.deltaY) || e.shiftKey)) {
+                var span = state.viewEnd - state.viewStart;
+                var shift = (e.deltaX || e.deltaY) * (span / el.olCanvas.getBoundingClientRect().width) * 1.5;
+                setView(state.viewStart + shift, state.viewEnd + shift);
+                drawWaveform(); drawOverlay();
+            } else if (e.deltaY !== 0) {
+                var rect = el.olCanvas.getBoundingClientRect();
+                var frac = clamp((e.clientX - rect.left) / rect.width, 0, 1);
+                var centerTime = state.viewStart + frac * (state.viewEnd - state.viewStart);
+                var factor = e.deltaY < 0 ? 1.25 : 0.8;
+                zoomAt(centerTime, factor);
+            }
+        }, { passive: false });
+
+        // Scrollbar drag: pan viewport or resize edges to zoom
+        var sbDrag = null; // { mode: 'pan'|'left'|'right', startX, origStart, origEnd }
+        var SB_EDGE = 6;
+        function sbHitTest(cx) {
+            var rect = el.zoomScrollbar.getBoundingClientRect();
+            var w = rect.width;
+            var x1 = (state.viewStart / state.duration) * w + rect.left;
+            var x2 = (state.viewEnd / state.duration) * w + rect.left;
+            if (Math.abs(cx - x1) <= SB_EDGE) return 'left';
+            if (Math.abs(cx - x2) <= SB_EDGE) return 'right';
+            if (cx > x1 && cx < x2) return 'pan';
+            return 'jump';
+        }
+        el.zoomScrollbar.addEventListener('mousedown', function (e) {
+            if (state.duration <= 0) return;
+            e.preventDefault();
+            var mode = sbHitTest(e.clientX);
+            if (mode === 'jump') {
+                var rect = el.zoomScrollbar.getBoundingClientRect();
+                var t = clamp((e.clientX - rect.left) / rect.width, 0, 1) * state.duration;
+                var span = state.viewEnd - state.viewStart;
+                setView(t - span / 2, t + span / 2);
+                drawWaveform(); drawOverlay();
+                mode = 'pan';
+            }
+            sbDrag = { mode: mode, startX: e.clientX, origStart: state.viewStart, origEnd: state.viewEnd };
+        });
+        window.addEventListener('mousemove', function (e) {
+            if (!sbDrag) {
+                if (el.zoomScrollbar.style.display !== 'none' && state.duration > 0) {
+                    var mode = sbHitTest(e.clientX);
+                    el.zoomScrollbar.style.cursor =
+                        mode === 'left' || mode === 'right' ? 'ew-resize' :
+                        mode === 'pan' ? 'grab' : 'pointer';
+                }
+                return;
+            }
+            var rect = el.zoomScrollbar.getBoundingClientRect();
+            var dx = e.clientX - sbDrag.startX;
+            var dt = (dx / rect.width) * state.duration;
+            if (sbDrag.mode === 'pan') {
+                setView(sbDrag.origStart + dt, sbDrag.origEnd + dt);
+            } else if (sbDrag.mode === 'left') {
+                var ns = clamp(sbDrag.origStart + dt, 0, sbDrag.origEnd - 0.1);
+                setView(ns, sbDrag.origEnd);
+            } else if (sbDrag.mode === 'right') {
+                var ne = clamp(sbDrag.origEnd + dt, sbDrag.origStart + 0.1, state.duration);
+                setView(sbDrag.origStart, ne);
+            }
+            el.zoomScrollbar.style.cursor = sbDrag.mode === 'pan' ? 'grabbing' : 'ew-resize';
+            drawWaveform(); drawOverlay();
+        });
+        window.addEventListener('mouseup', function () {
+            if (sbDrag) { sbDrag = null; el.zoomScrollbar.style.cursor = 'pointer'; }
+        });
+
+        // Touch support for scrollbar
+        el.zoomScrollbar.addEventListener('touchstart', function (e) {
+            if (state.duration <= 0 || e.touches.length !== 1) return;
+            e.preventDefault();
+            var cx = e.touches[0].clientX;
+            var mode = sbHitTest(cx);
+            if (mode === 'jump') {
+                var rect = el.zoomScrollbar.getBoundingClientRect();
+                var t = clamp((cx - rect.left) / rect.width, 0, 1) * state.duration;
+                var span = state.viewEnd - state.viewStart;
+                setView(t - span / 2, t + span / 2);
+                drawWaveform(); drawOverlay();
+                mode = 'pan';
+            }
+            sbDrag = { mode: mode, startX: cx, origStart: state.viewStart, origEnd: state.viewEnd };
+        }, { passive: false });
+        el.zoomScrollbar.addEventListener('touchmove', function (e) {
+            if (!sbDrag || e.touches.length !== 1) return;
+            e.preventDefault();
+            var cx = e.touches[0].clientX;
+            var rect = el.zoomScrollbar.getBoundingClientRect();
+            var dx = cx - sbDrag.startX;
+            var dt = (dx / rect.width) * state.duration;
+            if (sbDrag.mode === 'pan') {
+                setView(sbDrag.origStart + dt, sbDrag.origEnd + dt);
+            } else if (sbDrag.mode === 'left') {
+                var ns = clamp(sbDrag.origStart + dt, 0, sbDrag.origEnd - 0.1);
+                setView(ns, sbDrag.origEnd);
+            } else if (sbDrag.mode === 'right') {
+                var ne = clamp(sbDrag.origEnd + dt, sbDrag.origStart + 0.1, state.duration);
+                setView(sbDrag.origStart, ne);
+            }
+            drawWaveform(); drawOverlay();
+        }, { passive: false });
+        el.zoomScrollbar.addEventListener('touchend', function () { sbDrag = null; });
+    })();
+
+    // Controls
+    document.addEventListener('dragover', function (e) { e.preventDefault(); });
+    document.addEventListener('drop', function (e) { e.preventDefault(); });
+    el.dropZone.addEventListener('click', function () { el.fileInput.click(); });
+    el.dropZone.addEventListener('dragenter', function (e) { e.preventDefault(); e.stopPropagation(); el.dropZone.classList.add('dragover'); });
+    el.dropZone.addEventListener('dragover', function (e) { e.preventDefault(); e.stopPropagation(); el.dropZone.classList.add('dragover'); });
+    el.dropZone.addEventListener('dragleave', function (e) { e.stopPropagation(); el.dropZone.classList.remove('dragover'); });
+    el.dropZone.addEventListener('drop', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        el.dropZone.classList.remove('dragover');
+        var files = e.dataTransfer.files;
+        if (files && files.length > 0) handleFile(files[0]);
+    });
+    el.fileInput.addEventListener('change', function () { if (el.fileInput.files[0]) handleFile(el.fileInput.files[0]); });
+
+    el.playBtn.addEventListener('click', function () { state.isPlaying ? doStop() : doPlay(); });
+    el.loopBtn.addEventListener('click', toggleLoop);
+    el.setA.addEventListener('click', setA);
+    el.setB.addEventListener('click', setB);
+    el.clearLoop.addEventListener('click', clearLoopRegion);
+
+    el.speedSlider.addEventListener('input', function () { setSpeed(parseFloat(this.value)); });
+    el.speedReset.addEventListener('click', function () { el.speedSlider.value = 1; setSpeed(1); });
+    el.pitchSlider.addEventListener('input', function () { setPitch(parseInt(this.value, 10)); });
+    el.pitchReset.addEventListener('click', function () { el.pitchSlider.value = 0; setPitch(0); });
+
+    el.changeBtn.addEventListener('click', showUpload);
+    el.lyrics.addEventListener('input', saveLyrics);
+
+    document.addEventListener('keydown', function (e) {
+        if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+        if (e.code === 'Space') { e.preventDefault(); state.isPlaying ? doStop() : doPlay(); }
+        if (e.code === 'Escape') { e.preventDefault(); doStop(); }
+    });
+
+    window.addEventListener('resize', function () { if (!el.playerScreen.hidden) resizeCanvases(); });
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () {
+        if (!el.playerScreen.hidden) { drawWaveform(); drawOverlay(); updateSliderFill(el.speedSlider); updateSliderFill(el.pitchSlider); }
+    });
+
+    updateSliderFill(el.speedSlider);
+    updateSliderFill(el.pitchSlider);
+
+    if (!window.__SINGARIA_TEST__) {
+        getSavedAudio().then(function (saved) {
+            if (saved && saved.blob) {
+                var file = new File([saved.blob], saved.fileName || 'saved-song', { type: saved.blob.type });
+                loadAudio(file, { fromDB: true }).catch(function () {});
+            }
+        }).catch(function () {});
+    }
+
+    if (window.__SINGARIA_TEST__) {
+        window.__app = {
+            state: state, el: el, fmt: fmt, clamp: clamp,
+            getPos: getPos, doPlay: doPlay, doStop: doStop,
+            seekTo: seekTo, setSpeed: setSpeed, setPitch: setPitch,
+            toggleLoop: toggleLoop, setA: setA, setB: setB,
+            clearLoopRegion: clearLoopRegion, applyLoop: applyLoop,
+            scheduleLoopEnd: scheduleLoopEnd, cancelLoopTimer: cancelLoopTimer,
+            restartAtLoopStart: restartAtLoopStart,
+            showUpload: showUpload, showPlayer: showPlayer, loadAudio: loadAudio,
+            drawOverlay: drawOverlay, drawWaveform: drawWaveform,
+            saveLyrics: saveLyrics, loadLyrics: loadLyrics,
+            zoomAt: zoomAt, setView: setView, ensureVisible: ensureVisible, timeToX: timeToX,
+            drawScrollbar: drawScrollbar,
+            updatePitchShift: updatePitchShift,
+            openDB: openDB, saveAudioToDB: saveAudioToDB,
+            getSavedAudio: getSavedAudio, clearSavedAudio: clearSavedAudio
+        };
+    }
+})();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js');
+}
+</script>
